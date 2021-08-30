@@ -1,7 +1,7 @@
 package com.taufiq.routes
 
-import com.taufiq.model.Book
 import com.taufiq.model.BookBody
+import com.taufiq.repository.BookRepository
 import io.ktor.application.*
 import io.ktor.http.*
 import io.ktor.request.*
@@ -16,46 +16,43 @@ import java.util.*
 * DELETE 0.0.0.0:8080/books/{id}
 * */
 
-fun Route.bookRouting() = route("/books") {
+fun Route.bookRouting(repository: BookRepository = BookRepository()) =
+    route("/books") {
 
-    // current book
-    val books = mutableListOf<Book>()
 
-    get {
-        if (books.isNotEmpty()) {
-            call.respond(HttpStatusCode.OK, books)
-        } else {
-            call.respondText("Not Found", status = HttpStatusCode.NotFound)
+        get {
+            call.respond(HttpStatusCode.OK, repository.getBooks())
+
+        }
+
+        post {
+            val newBook = call.receive<BookBody>()
+            repository.insert(newBook.toBook(id = UUID.randomUUID().toString()))
+            call.respond(HttpStatusCode.OK, repository.getBooks())
+        }
+
+        put("/{id}") {
+            val bookId =
+                call.parameters["id"] ?: return@put call.respondText(
+                    "bad request",
+                    status = HttpStatusCode.BadRequest)
+
+            val bookBody = call.receive<BookBody>()
+
+            repository.update(bookBody.toBook(bookId))
+            call.respond(HttpStatusCode.OK, repository.getBooks())
+        }
+
+        delete("/{id}") {
+            val bookId = call.parameters["id"] ?: return@delete call.respondText(
+                "Bad Request",
+                status = HttpStatusCode.BadRequest
+            )
+            repository.delete(bookId)
+            call.respond(HttpStatusCode.OK, repository.getBooks())
         }
 
     }
-
-    post {
-        val newBook = call.receive<BookBody>()
-        books.add(newBook.toBook(id = UUID.randomUUID().toString()))
-        call.respond(HttpStatusCode.OK, books)
-    }
-
-    put("/{id}") {
-        val bookId = call.parameters["id"]
-        val bookBody = call.receive<BookBody>()
-
-        books.replaceAll { book ->
-            if (book.id == bookId) bookBody.toBook(bookId) else book
-        }
-
-        call.respond(HttpStatusCode.OK, books)
-    }
-
-    delete("/{id}") {
-        val bookId = call.parameters["id"]
-        books.removeIf { book ->
-            book.id == bookId
-        }
-        call.respond(HttpStatusCode.OK, books)
-    }
-
-}
 
 
 fun Application.registerBookRoute() {
